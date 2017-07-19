@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">HWRT</string>
+    <string name="take_picture">Take picture</string>
+    <string name="analyze">Scan Receipt</string>
+</resources>
