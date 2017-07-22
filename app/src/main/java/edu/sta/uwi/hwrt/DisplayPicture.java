@@ -10,15 +10,20 @@ import android.graphics.ColorMatrixColorFilter;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.os.Trace;
+import android.renderscript.Sampler;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 
+import java.util.Arrays;
+import java.util.Random;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.StringTokenizer;
 
 public class DisplayPicture extends AppCompatActivity {
 
@@ -30,6 +35,7 @@ public class DisplayPicture extends AppCompatActivity {
     private static final int PIXEL_WIDTH = 28;
     private ArrayList<Classification> classifications = new ArrayList<Classification>();
     private ArrayList<ConfRect> confRects =  new ArrayList<ConfRect>();
+    private File imgFile;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -52,79 +58,78 @@ public class DisplayPicture extends AppCompatActivity {
         //Get taken picture
         Intent intent = getIntent();
         String fileStr = intent.getStringExtra("picture");
-        File imgFile = new File(fileStr);
+        imgFile = new File(fileStr);
         if(imgFile.exists()) {
             myBitMap = BitmapFactory.decodeFile(imgFile.getAbsolutePath());
             ImageView imgView = (ImageView) findViewById(R.id.displayPic);
             imgView.setImageBitmap(myBitMap);
-            imgFile.delete();
+            //imgFile.delete();
         }
     }
 
-    private void scanReceipt() {
-        gray = toGrayScale();
-        ImageView imgView = (ImageView) findViewById(R.id.displayPic);
-        imgView.refreshDrawableState();
-        imgView.setImageBitmap(gray);
+    protected void sendText(String imgPath, String text) {
+        Intent intent = new Intent(this,DisplayText.class);
+        intent.putExtra("picture", imgPath);
+        intent.putExtra("text",text);
+        startActivity(intent);
+    }
 
-        scanBitmap();
+    private void scanReceipt() {
+        //int [] int_image = arrayFromBitmap(myBitMap);
+        //Classification res = mClassifier.recogize(int_image);
+        //scanBitmap();
+
+        ArrayList<Integer> chars = new ArrayList<Integer>();
+        for(int i = 0; i < 56; i++) {
+            Random rnd = new Random();
+            int n = rnd.nextInt(56) + 0;
+            if(chars.contains(n)) {
+                i--;
+                continue;
+            }
+            chars.add(n);
+        }
+
+        System.out.println(chars);
+
+
+        String preds = "";
+        for (int j = 0; j < chars.size();j++) {
+            int [] input = new int[1];
+            input[0] = chars.get(j).intValue();
+            String rs = mClassifier.recogize(input);
+
+            if(rs.toString().contains("\n")) {
+                System.out.println("Hello rs:" + rs);
+                preds += " \n ";
+            } else {
+                preds += rs;
+            }
+        }
+
+        System.out.println(preds);
+        sendText(imgFile.getAbsolutePath(),preds);
     }
 
     private void scanBitmap() {
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                int croppedWidth, croppedHeight, offset_x,offset_y, croppedSize;
-                Bitmap croppedBMP;
-                Bitmap scaledBM = Bitmap.createScaledBitmap(gray,480,360,true);
-                gray.recycle();
-                //for(croppedWidth = 100; croppedWidth < 300; croppedWidth += 20) {
-                    for(croppedSize = 30; croppedSize < 100; croppedSize += 20) {
-                        for(offset_x = 0; offset_x < scaledBM.getWidth() - croppedSize; offset_x += croppedSize/4) {
-                            for(offset_y = 0; offset_y < scaledBM.getHeight() - croppedSize; offset_y += croppedSize/4) {
-                                croppedBMP = Bitmap.createBitmap(scaledBM,offset_x,offset_y,croppedSize,croppedSize);
-
-                                Bitmap resizedBM = Bitmap.createScaledBitmap(croppedBMP,28,28, true);
-                                float pixels[] = getPixelData(resizedBM);
-                                resizedBM.recycle();
-                                croppedBMP.recycle();
-                                Classification res = mClassifier.recogize(pixels);
-                                if(res.getLabel() != null) {
-                                    if(res.getConf() >= 0.999f) {
-                                        //classifications.add(res);
-//                                        ConfRect confRect = ConfRect.create(offset_x,offset_y,offset_x+croppedSize,offset_y+croppedSize,res);
-//                                        if(confRects.isEmpty()) {
-//                                            confRects.add(confRect);
-//                                        } else {
-//                                            for (int i = 0; i < confRects.size(); i++) {
-//                                                ConfRect cr = confRects.get(i);
-//                                                if(cr.intersects(confRect.getRect())) {
-//                                                    if(confRect.getClassification().getConf() > cr.getClassification().getConf()) {
-//                                                        int idx = confRects.indexOf(cr);
-//                                                        confRects.remove(idx);
-//                                                        confRects.add(idx,confRect);
-//                                                    }
-//                                                } else {
-//                                                    confRects.add(confRect);
-//                                                }
-//                                            }
-//                                        }
-                                        System.out.println(res.getLabel() + ", " + res.getConf());
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-//                    for(ConfRect cr : confRects) {
-//                        System.out.print(cr.getClassification().getLabel() + ", "  + cr.getClassification().getConf());
-//                    }
-                //}
-                scaledBM.recycle();
-                //gray.recycle();
-            }
-        }).start();
     }
+
+    public static int[] arrayFromBitmap(Bitmap source){
+        int width = source.getWidth();
+        int height = source.getHeight();
+//        int [][] result = new int[width][height];
+        int[] pixels = new int[width*height];
+        source.getPixels(pixels, 0, width, 0, 0, width, height);
+//        int pixelsIndex = 0;
+//        for (int i = 0; i < width; i++) {
+//            for (int j = 0; j < height; j++) {
+//                result[i][j] = pixels[pixelsIndex];
+//                pixelsIndex++;
+//            }
+//        }
+        return pixels;
+    }
+
     private float[] getPixelData(Bitmap bitmap) {
         int[] pixels = new int[PIXEL_WIDTH * PIXEL_WIDTH];
         bitmap.getPixels(pixels,0,bitmap.getWidth(),0,0,bitmap.getWidth(),bitmap.getHeight());
@@ -143,9 +148,7 @@ public class DisplayPicture extends AppCompatActivity {
            @Override
            public void run() {
                try {
-                   mClassifier = TensorflowClassifier.create(getAssets(),"TensorFlow",
-                           "optimized_tfdroid.pb", "labels.txt", PIXEL_WIDTH,
-                           "input","output",false);
+                   mClassifier = TensorflowClassifier.create(getAssets(),"TensorFlow", "rnn_optimized_model_mobile.pb", "stringmap.txt", PIXEL_WIDTH, "input_data:0","probs",false);
                } catch (final Exception e) {
                    throw new RuntimeException("Error initializing Classifiers!", e);
                }

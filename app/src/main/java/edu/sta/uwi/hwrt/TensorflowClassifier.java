@@ -3,13 +3,18 @@ package edu.sta.uwi.hwrt;
 
 import android.content.res.AssetManager;
 
+import org.tensorflow.Tensor;
+import org.tensorflow.TensorFlow;
 import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import edu.sta.uwi.hwrt.Utils;
 
 public class TensorflowClassifier implements Classifier {
 
@@ -22,20 +27,38 @@ public class TensorflowClassifier implements Classifier {
     private boolean feedKeepProb;
 
     private List<String> labels;
+    private HashMap<String, String> map;
     private float[] output;
     private String[] outputNames;
+    private String [] chars;
 
-    private static List<String> readLabels(AssetManager am, String fileName) throws IOException {
+    private static HashMap<String, String> readLabels(AssetManager am, String fileName) throws IOException {
         BufferedReader br = new BufferedReader(new InputStreamReader(am.open(fileName)));
 
         String line;
-        List<String> labels = new ArrayList<>();
+        //List<String> labels = new ArrayList<>();
+        HashMap<String, String> map = new HashMap<String, String>();
         while ((line = br.readLine()) != null) {
-            labels.add(line);
+            String [] parts = line.split(":",2);
+            if(parts.length >= 2) {
+                String key = parts[0];
+                String val = parts[1];
+                map.put(key,val);
+            } else {
+                System.out.println("ignoring line:" + line);
+            }
         }
-
         br.close();
-        return labels;
+        return map;
+    }
+
+    private static String [] getchars(HashMap<String, String> map) {
+        String [] chars = new String[map.size()];
+        for (String key: map.keySet()){
+            int idx = Integer.parseInt(map.get(key));
+            chars[idx] = key;
+        }
+        return chars;
     }
 
     public static TensorflowClassifier create(AssetManager assetManager, String name,
@@ -51,11 +74,12 @@ public class TensorflowClassifier implements Classifier {
         c.outputName = outputName;
 
         //read labels for label file
-        c.labels = readLabels(assetManager, labelFile);
+        c.map = readLabels(assetManager, labelFile);
+        c.chars = getchars(c.map);
 
         //set its model path and where the raw asset files are
         c.tfHelper = new TensorFlowInferenceInterface(assetManager, modelPath);
-        int numClasses = 10;
+        int numClasses = 57;
 
         //how big is the input?
         c.inputSize = inputSize;
@@ -76,9 +100,8 @@ public class TensorflowClassifier implements Classifier {
         return name;
     }
 
-    @Override
-    public Classification recogize(final float[] pixels) {
-        tfHelper.feed(inputName, pixels, 1, inputSize, inputSize, 1);
+    public String recogize(final int[] pixels) {
+        tfHelper.feed(inputName, pixels, 1,1);
 
         if (feedKeepProb) {
             tfHelper.feed("keep_prob", new float[] { 1 });
@@ -87,14 +110,21 @@ public class TensorflowClassifier implements Classifier {
 
         tfHelper.fetch(outputName, output);
 
-        Classification ans = new Classification();
-        for (int i = 0; i < output.length; ++i) {
-            if (output[i] > THRESHOLD && output[i] > ans.getConf()) {
-                ans.update(output[i], labels.get(i));
-//                System.out.println(output[i]);
-//                System.out.println(labels.get(i));
-            }
-        }
+        Utils util = new Utils();
+        int p = util.weightedPick(output);
+        //System.out.println(output);
+        String ans;
+        //if(p < chars.length) {
+        ans = chars[p];
+        //}
+        //Classification ans = new Classification();
+//        for (int i = 0; i < output.length; ++i) {
+//            if (output[i] > THRESHOLD && output[i] > ans.getConf()) {
+//                ans.update(output[i], labels.get(i));
+////                System.out.println(output[i]);
+////                System.out.println(labels.get(i));
+//            }
+//        }
 
         return ans;
     }

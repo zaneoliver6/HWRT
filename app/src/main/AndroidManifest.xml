@@ -27,6 +27,20 @@
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value=".MainActivity" />
         </activity>
+        <activity android:name=".DisplayText"
+            android:parentActivityName=".DisplayPicture" >
+            <!-- The meta-data tag is required if you support API level 15 and lower -->
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value=".DisplayPicture" />
+        </activity>
+        <activity android:name=".AnnotateImg"
+            android:parentActivityName=".DisplayText" >
+            <!-- The meta-data tag is required if you support API level 15 and lower -->
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value=".DisplayText" />
+        </activity>
     </application>
 
 </manifest>
