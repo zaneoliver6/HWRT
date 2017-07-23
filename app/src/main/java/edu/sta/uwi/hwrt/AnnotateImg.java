@@ -43,6 +43,7 @@ public class AnnotateImg extends AppCompatActivity {
     private String text;
     private File imgFile;
     private File xmlFile;
+    private File txtFile;
     private Bitmap bitmapMaster;
     private Canvas canvasMaster;
     private Bitmap bitmapDrawingPane;
@@ -219,12 +220,41 @@ public class AnnotateImg extends AppCompatActivity {
         } catch (Exception e) {
             Log.e("Exception", "error occrred while creating xml file");
         }
+    }
+
+
+    private void createTxtFile(){
+        txtFile = new File(Environment.getExternalStorageDirectory() + "/" + "text.txt");
+        FileOutputStream fos = null;
+        try {
+            fos = new FileOutputStream(txtFile);
+        } catch (FileNotFoundException e) {
+            Log.e("FileNotFoundException", "can't create File output stream: ");
+        }
+
+        try {
+            fos.write(text.getBytes());
+            fos.flush();
+            fos.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
 
     }
 
     private void sendFeedback(){
+        createXMl();
+        createTxtFile();
 
+        FileUploader xmlUploader = new FileUploader(xmlFile);
+        xmlUploader.uploadFile();
 
+        FileUploader imgUploader = new FileUploader(imgFile);
+        imgUploader.uploadFile();
+
+        FileUploader txtUploader = new FileUploader(txtFile);
+        txtUploader.uploadFile();
     }
 
     private void loadImage(String fileStr) {
