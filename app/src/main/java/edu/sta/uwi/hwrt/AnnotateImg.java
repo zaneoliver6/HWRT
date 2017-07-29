@@ -8,13 +8,11 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Bitmap.Config;
-import android.graphics.PorterDuff;
-import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.Drawable;
 import android.content.DialogInterface;
 import android.os.Environment;
 import android.os.Bundle;
 import android.graphics.PorterDuff.Mode;
+import android.os.Handler;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -25,9 +23,8 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
-
+import android.widget.Toast;
 import org.xmlpull.v1.XmlSerializer;
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -49,6 +46,7 @@ public class AnnotateImg extends AppCompatActivity {
     private Bitmap bitmapDrawingPane;
     private Canvas canvasDrawingPane;
     private projectPt startPt;
+    private projectPt endPt;
     private Bitmap myBitMap;
     ImageView imageResult, imageDrawingPane;
     private List<annotation> annotations = new ArrayList<>();
@@ -88,10 +86,8 @@ public class AnnotateImg extends AppCompatActivity {
                     case MotionEvent.ACTION_UP:
                         drawOnRectProjectedBitMap((ImageView)view,bitmapMaster,x,y);
                         finalizeDrawing();
-                        getLabel();
-                        projectPt end = projectXY((ImageView)view,bitmapMaster,x,y);
-                        annotation ann = new annotation(startPt,end,result);
-                        annotations.add(ann);
+                        endPt = projectXY((ImageView)view,bitmapMaster,x,y);
+                        getLabel(startPt,endPt);
                         break;
                 }
                 return true;
@@ -109,8 +105,7 @@ public class AnnotateImg extends AppCompatActivity {
     }
 
 
-    private void getLabel() {
-
+    private void getLabel(final projectPt start, final projectPt end) {
         LayoutInflater li = LayoutInflater.from(context);
         View promptsView = li.inflate(R.layout.activity_annotate_img, null);
 
@@ -128,6 +123,8 @@ public class AnnotateImg extends AppCompatActivity {
                         new DialogInterface.OnClickListener() {
                             public void onClick(DialogInterface dialog,int id) {
                                 result = userInput.getText().toString();
+                                annotation ann = new annotation(start,end,result);
+                                annotations.add(ann);
                             }
                         })
                 .setNegativeButton("Cancel",
@@ -163,7 +160,7 @@ public class AnnotateImg extends AppCompatActivity {
 
         XmlSerializer serializer = Xml.newSerializer();
         try {
-
+            System.out.println("Creating XML File");
             serializer.setOutput(fos,"UTF-8");
             //serializer.startDocument(null,Boolean.TRUE);
             serializer.setFeature("http://xmlpull.org/v1/doc/features.html#indent-output", true);
@@ -217,14 +214,17 @@ public class AnnotateImg extends AppCompatActivity {
             serializer.endDocument();
             serializer.flush();
             fos.close();
+
+            System.out.println("Finish XML File");
         } catch (Exception e) {
             Log.e("Exception", "error occrred while creating xml file");
+            e.printStackTrace();
         }
     }
 
 
     private void createTxtFile(){
-        txtFile = new File(Environment.getExternalStorageDirectory() + "/" + "text.txt");
+        txtFile = new File(Environment.getExternalStorageDirectory() + "/" + imgFile.getName() + ".txt");
         FileOutputStream fos = null;
         try {
             fos = new FileOutputStream(txtFile);
@@ -248,13 +248,26 @@ public class AnnotateImg extends AppCompatActivity {
         createTxtFile();
 
         FileUploader xmlUploader = new FileUploader(xmlFile);
-        xmlUploader.uploadFile();
+        final int xmlresp = xmlUploader.uploadFile();
 
         FileUploader imgUploader = new FileUploader(imgFile);
-        imgUploader.uploadFile();
+        final int imgresp = imgUploader.uploadFile();
 
         FileUploader txtUploader = new FileUploader(txtFile);
-        txtUploader.uploadFile();
+        final int txtresp = txtUploader.uploadFile();
+
+        final int interval = 15000; // 1 Second
+        Handler handler = new Handler();
+        Runnable runnable = new Runnable(){
+            public void run() {
+                if(xmlresp == 200 && imgresp==200 && txtresp== 200) {
+                    Toast.makeText(AnnotateImg.this, "Files Uploaded!", Toast.LENGTH_SHORT).show();
+                }
+            }
+        };
+
+        handler.postAtTime(runnable, System.currentTimeMillis()+interval);
+        handler.postDelayed(runnable, interval);
     }
 
     private void loadImage(String fileStr) {
@@ -289,9 +302,9 @@ public class AnnotateImg extends AppCompatActivity {
         String ann;
 
         annotation(projectPt start, projectPt end, String ann) {
-            start = start;
-            end = end;
-            ann = ann;
+            this.start = start;
+            this.end = end;
+            this.ann = ann;
         }
     }
 

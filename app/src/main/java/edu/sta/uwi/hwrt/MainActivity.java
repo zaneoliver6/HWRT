@@ -1,8 +1,10 @@
 package edu.sta.uwi.hwrt;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -14,10 +16,10 @@ import java.util.List;
 import java.util.Locale;
 
 import android.Manifest;
+import android.app.DownloadManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.ImageFormat;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
@@ -31,12 +33,11 @@ import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
-import android.media.Image.Plane;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -47,7 +48,7 @@ import android.util.SparseIntArray;
 import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
-import android.widget.ImageView;
+
 import android.widget.Button;
 import android.content.Intent;
 import android.widget.Toast;
@@ -66,6 +67,7 @@ public class MainActivity extends AppCompatActivity {
         Orientations.append(Surface.ROTATION_270, 180);
     }
     private String cameraId;
+    private boolean useUpdatedModels = false;
     protected CameraDevice cameraDevice;
     protected CameraCaptureSession cameraCaptureSessions;
     protected CaptureRequest captureRequest;
@@ -74,7 +76,6 @@ public class MainActivity extends AppCompatActivity {
     private ImageReader imageReader;
     private File file;
     private static final int REQUEST_CAMERA_PERMISSION = 200;
-    private boolean mFlashSupported;
     private Handler mBackgroundHandler;
     private HandlerThread mBackgroundThread;
 
@@ -258,6 +259,7 @@ public class MainActivity extends AppCompatActivity {
     protected void sendImg(String imgPath) {
         Intent intent = new Intent(this,DisplayPicture.class);
         intent.putExtra("picture", imgPath);
+        intent.putExtra("useNewModels", useUpdatedModels);
         startActivity(intent);
     }
 
@@ -350,6 +352,79 @@ public class MainActivity extends AppCompatActivity {
             textureView.setSurfaceTextureListener(textureListener);
         }
     }
+
+    private void checkforUpdates(){
+
+        try {
+            File sdcard = Environment.getExternalStorageDirectory();
+            File file = new File(sdcard,"CurrVersion.txt");
+
+            if(!file.exists()) {
+                String version = "1";
+
+                FileOutputStream fos = new FileOutputStream(file);
+                fos.write(version.getBytes());
+                fos.flush();
+                fos.close();
+
+            } else {
+
+                BufferedReader br = new BufferedReader(new FileReader(file));
+                String line;
+                line = br.readLine();
+                br.close();
+
+                downloadUpdates("version.txt");
+
+                File versionFile = new File(Environment.getExternalStorageDirectory(), "version.txt");
+
+                BufferedReader brv = new BufferedReader(new FileReader(versionFile));
+                String lineU;
+                lineU = brv.readLine();
+                brv.close();
+
+                if(Integer.parseInt(line) > Integer.parseInt(lineU)) {
+                    downloadUpdates("output_inference_graph.pb");
+                    downloadUpdates("rnn_optimized_model_mobile.pb");
+                    downloadUpdates("stringmap.txt");
+                    useUpdatedModels = true;
+
+                    String version = lineU;
+
+                    FileOutputStream fos = new FileOutputStream(file);
+                    fos.write(version.getBytes());
+                    fos.flush();
+                    fos.close();
+
+
+                }
+
+            }
+        }catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+
+    private void downloadUpdates(String filename) {
+        String url = "http://40.71.219.226/download/" + filename;
+        DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+        request.setDescription("Updates");
+        request.setTitle("Model Updates");
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+            request.allowScanningByMediaScanner();
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+        }
+        request.setDestinationInExternalPublicDir(Environment.getExternalStorageDirectory().getAbsolutePath(), filename);
+
+
+        DownloadManager manager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+        manager.enqueue(request);
+    }
+
+
 
 //    @Override
 //    protected void onPause() {

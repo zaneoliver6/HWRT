@@ -8,6 +8,8 @@ import org.tensorflow.TensorFlow;
 import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -32,8 +34,16 @@ public class TensorflowClassifier implements Classifier {
     private String[] outputNames;
     private String [] chars;
 
-    private static HashMap<String, String> readLabels(AssetManager am, String fileName) throws IOException {
-        BufferedReader br = new BufferedReader(new InputStreamReader(am.open(fileName)));
+    private static HashMap<String, String> readLabels(AssetManager am, String fileName,boolean useAssets) throws IOException {
+
+        BufferedReader br = null;
+
+        if (useAssets) {
+            br = new BufferedReader(new InputStreamReader(am.open(fileName)));
+        } else {
+            File file = new File(fileName);
+            br = new BufferedReader(new InputStreamReader(new FileInputStream(file)));
+        }
 
         String line;
         //List<String> labels = new ArrayList<>();
@@ -61,9 +71,7 @@ public class TensorflowClassifier implements Classifier {
         return chars;
     }
 
-    public static TensorflowClassifier create(AssetManager assetManager, String name,
-                                              String modelPath, String labelFile, int inputSize, String inputName, String outputName,
-                                              boolean feedKeepProb) throws IOException {
+    public static TensorflowClassifier create(AssetManager assetManager, String name, String modelPath, String labelFile, String inputName, String outputName, boolean useAssets ,boolean feedKeepProb) throws IOException {
         //intialize a classifier
         TensorflowClassifier c = new TensorflowClassifier();
 
@@ -74,7 +82,7 @@ public class TensorflowClassifier implements Classifier {
         c.outputName = outputName;
 
         //read labels for label file
-        c.map = readLabels(assetManager, labelFile);
+        c.map = readLabels(assetManager, labelFile,useAssets);
         c.chars = getchars(c.map);
 
         //set its model path and where the raw asset files are
@@ -82,12 +90,12 @@ public class TensorflowClassifier implements Classifier {
         int numClasses = 57;
 
         //how big is the input?
-        c.inputSize = inputSize;
+        //c.inputSize = inputSize;
 
         // Pre-allocate buffer.
         c.outputNames = new String[] { outputName };
 
-        c.outputName = outputName;
+        //c.outputName = outputName;
         c.output = new float[numClasses];
 
         c.feedKeepProb = feedKeepProb;
@@ -100,14 +108,13 @@ public class TensorflowClassifier implements Classifier {
         return name;
     }
 
-    public String recogize(final int[] pixels) {
-        tfHelper.feed(inputName, pixels, 1,1);
+    public String predict(final int[] input) {
+        tfHelper.feed(inputName, input, 1,1);
 
         if (feedKeepProb) {
             tfHelper.feed("keep_prob", new float[] { 1 });
         }
         tfHelper.run(outputNames);
-
         tfHelper.fetch(outputName, output);
 
         Utils util = new Utils();

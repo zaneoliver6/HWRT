@@ -13,21 +13,24 @@ import java.net.URL;
 public class FileUploader  {
 
     private File f;
+    private int resp;
 
     public FileUploader(File file) {
         f = file;
     }
 
-    public void uploadFile() {
+    public int uploadFile() {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                upload();
+               resp = upload();
             }
         }).start();
+
+        return resp;
     }
 
-    public void upload() {
+    public int upload() {
 
         int ServerResponseCode = 0;
 
@@ -43,7 +46,7 @@ public class FileUploader  {
         try {
 
             FileInputStream fileInputStream = new FileInputStream(f);
-            URL url = new URL("http://http://40.71.219.226/upload");
+            URL url = new URL("http://40.71.219.226/upload");
 
             conn = (HttpURLConnection) url.openConnection();
             conn.setDoInput(true);
@@ -53,12 +56,12 @@ public class FileUploader  {
             conn.setRequestProperty("Connection","Keep-Alive");
             conn.setRequestProperty("ENCTYPE", "multipart/form-data");
             conn.setRequestProperty("Content-Type", "multipart/form-data;boundary=" + boundary);
-            conn.setRequestProperty("file", f.getAbsolutePath());
+            conn.setRequestProperty("file", f.getName());
 
             dos = new DataOutputStream(conn.getOutputStream());
 
             dos.writeBytes(twoHyphens + boundary + lineEnd);
-            dos.writeBytes("Content-Disposition: form-data; name=\"file\";filename=\"" + f.getAbsolutePath() + "\"" + lineEnd);
+            dos.writeBytes("Content-Disposition: form-data; name=\"file\";filename=\"" + f.getName() + "\"" + lineEnd);
             dos.writeBytes(lineEnd);
 
             bytesAvailable = fileInputStream.available();
@@ -93,6 +96,10 @@ public class FileUploader  {
             e.printStackTrace();
             System.out.println(e.getMessage());
         }
+
+        f.delete();
+
+        return ServerResponseCode;
 
     }
 
